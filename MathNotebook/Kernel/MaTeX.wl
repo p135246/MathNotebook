@@ -12,6 +12,8 @@ PackageScope["executableDirectories"]
 PackageScope["mathTeX"]
 PackageScope["maTeXCellQ"]
 PackageScope["maTeXCell"]
+PackageScope["maTeXBox"]
+PackageScope["maTeXBoxTeX"]
 PackageScope["toMaTeXNotebook"]
 PackageScope["fromMaTeXNotebook"]
 PackageScope["laTeXToMaTeXCell"]
@@ -121,10 +123,45 @@ maTeXCell[ tex_String, style_String, options_List, size_ ] :=
   maTeXCell[ tex, style, options, size, None ]
 
 maTeXCell[ tex_String, style_String, options_List, size_, source_ ] :=
-  Cell[ BoxData[ ToBoxes @ MaTeX`MaTeX[ tex, "DisplayStyle" -> True, FontSize -> size ] ], style,
+  Cell[ BoxData[ maTeXBox[ tex, ToBoxes @ MaTeX`MaTeX[ tex, "DisplayStyle" -> True, FontSize -> size ] ] ], style,
     Sequence @@ retainedCellOptions[ options ],
     TaggingRules -> <| "MathNotebook" -> <| "SourceTeX" -> tex, "MaTeX" -> True,
       If[ StringQ[ source ], "LaTeXSource" -> source, Nothing ] |> |> ]
+
+(* EditableMaTeX T1: the picture goes in the front end's own TeX assistant box — the one Ctrl+4 makes —
+   which carries the TeX beside it in an "input" slot and is therefore editable, where a bare
+   GraphicsBox can only be selected and resized. Clicking it is the front end's business
+   (doEnterTeXAssistant in InputAssistant.mx), and the string it hands back goes through
+   InputAssistant`TeXStringToBoxes — which is the symbol $maTeXPreferences overrides, so an edit
+   re-renders through MaTeX exactly when $useMaTeXQ is set and through the built-in parser otherwise.
+
+   Three measurements hold this up (2026-08-01, 15.0.0). The wrapper is display-transparent: one
+   DisplayFormula cell rendered as a whole notebook at 144 dpi, Background -> White and
+   LightDark -> "Light", measures {183, 40} px and 1083 ink bare and {183, 40} px and 1083 ink wrapped.
+   It survives a file: Export then NotebookOpen/NotebookGet gives back
+   Cell[ BoxData[ TemplateBox[ <| four slots |>, "TeXAssistantTemplate" ] ], "DisplayFormula" ] with the
+   input string byte-intact — unlike a ButtonBox in a TextData, this box is not split by the reopen.
+   And only "Boxes" may be written: a kernel-written "state" -> "Input" falls through
+   InputAssistantBoxes' own Which to its pleaseUpgradeBoxes branch and draws the panel "Displaying this
+   output requires a more recent version", which reads as a version fault and is not one. *)
+maTeXBox[ tex_String, boxes_ ] :=
+  TemplateBox[ <| "boxes" -> boxes, "errors" -> { }, "input" -> tex, "state" -> "Boxes" |>,
+    "TeXAssistantTemplate" ]
+
+(* The reader is deliberately narrow — the box as a cell's whole content, or the box itself — rather
+   than a FirstCase at Infinity: a Text cell may hold several inline assistant boxes, and "the TeX of
+   this cell" is then not a question with one answer. *)
+maTeXBoxTeX[ Cell[ BoxData[ boxes_ ], ___ ] ] :=
+  maTeXBoxTeX[ boxes ]
+
+maTeXBoxTeX[ FormBox[ boxes_, _ ] ] :=
+  maTeXBoxTeX[ boxes ]
+
+maTeXBoxTeX[ TemplateBox[ slots_, "TeXAssistantTemplate", ___ ] ] :=
+  Lookup[ Association @ slots, "input", $Failed ]
+
+maTeXBoxTeX[ _ ] :=
+  $Failed
 
 laTeXToMaTeXCell[ size_ ][ Cell[ TextData[ parts : _String | { __String } ], style_String, options___ ] ] :=
   laTeXToMaTeXCell[ size ][ Cell[ StringJoin @ Flatten @ { parts }, style, options ] ]

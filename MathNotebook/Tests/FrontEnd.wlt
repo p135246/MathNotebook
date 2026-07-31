@@ -385,8 +385,16 @@ maTeXDocument[ parent_ ] :=
     { Cell[ BoxData[ FormBox[ SuperscriptBox[ "x", "2" ], TraditionalForm ] ], "DisplayFormula" ] },
     StyleDefinitions -> parent, Visible -> False ] ]
 
+(* EditableMaTeX T1: the size is read off the GraphicsBox wherever the option stands, not off a
+   GraphicsBox whose options are its own arguments. The front end **normalizes displayed boxes and only
+   displayed boxes**: a graphic written as a cell's content comes back with its options spliced up
+   (ImageSize at depth 5), and the same graphic parked in a TemplateBox's association slot comes back
+   exactly as the kernel wrote it, options still in a nested list (Key["boxes"], 2, 1). So the old
+   pattern GraphicsBox[ ___, ImageSize -> { w_, _ }, ___ ] read 91.4887 before the wrapper and 0 after
+   it — three tests reporting a size regression where nothing about the image had changed. *)
 maTeXWidth[ notebook_NotebookObject ] :=
-  FirstCase[ NotebookGet[ notebook ], GraphicsBox[ ___, ImageSize -> { width_, _ }, ___ ] :> width, 0, Infinity ]
+  FirstCase[ FirstCase[ NotebookGet[ notebook ], _GraphicsBox, Missing[ "NotFound" ], Infinity ],
+    HoldPattern[ ImageSize -> { width_?NumericQ, _ } ] :> width, 0, Infinity ]
 
 (* The LaTeX pair, end to end and through the front end, which is the only place the claim can be
    made: the pure cores say what the tagging rules hold, and only a real render says the image was
@@ -420,6 +428,13 @@ maTeXMeasurements[ parent_ ] :=
          palette's two MaTeX buttons reach and what no test drove. A rendered cell IS an image, so the
          detector is the GraphicsBox appearing and then going away again. *)
       "Rendered" -> Count[ NotebookGet[ base ], _GraphicsBox, Infinity ],
+      (* EditableMaTeX T1: the picture has to reach the document inside the front end's TeX assistant
+         box, with its TeX intact — a NotebookWrite is free to take a box apart, as it does a ButtonBox
+         in a TextData, and a kernel test of the constructor cannot see that. *)
+      "Editable" -> Count[ NotebookGet[ base ], TemplateBox[ _, "TeXAssistantTemplate", ___ ], Infinity ],
+      "EditableTeX" -> FirstCase[ NotebookGet[ base ],
+        TemplateBox[ slots_, "TeXAssistantTemplate", ___ ] :> Lookup[ Association @ slots, "input", None ],
+        None, Infinity ],
       "Unrendered" -> ( ConvertFromMaTeX[ base ]; Count[ NotebookGet[ base ], _GraphicsBox, Infinity ] ),
       "TypedRendered" -> firstCellShape[ typed ],
       "TypedBack" -> ( ConvertMaTeXToLaTeX[ typed ]; firstCellShape[ typed ] ) |>;
@@ -1678,6 +1693,16 @@ If[ $maTeXAvailable,
 VerificationTest[
   Lookup[ $measured[ "MaTeX" ], { "Rendered", "Unrendered" } ],
   { 1, 0 }
+]
+]
+
+(* EditableMaTeX T1: what the author gets is not a bare picture but the front end's own TeX assistant
+   box, carrying the TeX it was rendered from — which is what makes the mathematics editable again, and
+   what a kernel assertion about the constructor cannot claim about a document. *)
+If[ $maTeXAvailable,
+VerificationTest[
+  Lookup[ $measured[ "MaTeX" ], { "Editable", "EditableTeX" } ],
+  { 1, "x^2" }
 ]
 ]
 
