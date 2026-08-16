@@ -24,17 +24,16 @@ Cell["ConvertToMaTeX", "ObjectName",
  CellID->133984591,ExpressionUUID->"eca0cdf3-e3e4-4726-95dc-e99337a986e3"],
 
 Cell[TextData[{
- Cell["   ", "ModInfo",ExpressionUUID->"ad3e685c-e6c4-4232-ac15-fafa2bcba48c"],
+ Cell["   ", "ModInfo",ExpressionUUID->"96c0e9c0-4530-55bc-3817-64b3baf15b0e"],
  Cell[BoxData[
   RowBox[{
    ButtonBox["ConvertToMaTeX",
     BaseStyle->"Link",
     ButtonData->"paclet:WolframInstitute/MathNotebook/ref/ConvertToMaTeX"], 
    RowBox[{"[", "]"}]}]], "InlineFormula",ExpressionUUID->
-  "fb663f93-1097-496b-8237-e8ef09e03e9d"],
+  "a34ac6ab-762e-3f27-fd9c-805ca8f3c216"],
  " \[LineSeparator]",
- "renders the selected display math cells with MaTeX, or all of them if \
-nothing is selected.",
+ "renders the selected math with MaTeX -- display cells whole, inline islands in prose cells one by one -- or all of it if nothing is selected.",
  "\n",
  Cell[BoxData[
   RowBox[{
@@ -42,19 +41,22 @@ nothing is selected.",
     BaseStyle->"Link",
     ButtonData->"paclet:WolframInstitute/MathNotebook/ref/ConvertToMaTeX"], 
    RowBox[{"[", "notebook", "]"}]}]], "InlineFormula",ExpressionUUID->
-  "d61b1cf1-da38-4124-9003-4f0473265246"],
+  "3000ed16-f96f-8300-2b8b-cd2a2a8b984d"],
  " \[LineSeparator]",
- "converts the given notebook.",
- Cell["   ", "ModInfo",ExpressionUUID->"00d1583d-5b84-4d91-97f6-2ee8fa8d7196"],
+ "converts the given ",
+ Cell[BoxData[
+  StyleBox["notebook", "TI"]], "InlineFormula",ExpressionUUID->
+  "36da669f-a872-cc4a-fdf6-566456968cf8"],
+ ".",
+ "\n",
  Cell[BoxData[
   RowBox[{
    ButtonBox["ConvertToMaTeX",
     BaseStyle->"Link",
     ButtonData->"paclet:WolframInstitute/MathNotebook/ref/ConvertToMaTeX"], 
-   RowBox[{"[", 
-    RowBox[{"{", 
-     RowBox[{"cell", ",", " ", "..."}], "}"}], "]"}]}]], "InlineFormula",
-  ExpressionUUID->"1db456bb-64ff-4ac8-bbde-59e576d6fce3"],
+   RowBox[{"[", RowBox[{"{", 
+     RowBox[{"cell", ", ", " ", "..."}], "}"}], "]"}]}]], "InlineFormula",ExpressionUUID->
+  "ed4f1b81-2d33-002a-48ea-61e178ac35c8"],
  " \[LineSeparator]",
  "converts the given cells."
 }], "Usage",

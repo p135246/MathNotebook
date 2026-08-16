@@ -33,7 +33,7 @@ Cell[TextData[{
    RowBox[{"[", "]"}]}]], "InlineFormula",ExpressionUUID->
   "e88e517c-9ecb-a9a0-45e7-a98e9b7887f7"],
  " \[LineSeparator]",
- "renders the LaTeX source held as text in the selected cells with MaTeX, taking each cell whole: the body inside its display delimiters where it has any, all of its text where it has none. The source is stored on the rendered cell, so ConvertMaTeXToLaTeX gives back exactly what was typed. Nothing is converted when nothing is selected.",
+ "renders the LaTeX source held as text in the selected cells with MaTeX. A cell that is one display formula -- $$..$$, \\[..\\], equation, align, gather, multline, alignat, starred or not -- or a bare fragment renders whole; prose renders piecewise, display spans as display cells and $..$ or \\(..\\) runs as inline islands. The source is stored on every rendered cell, so ConvertMaTeXToLaTeX gives back what was typed. Nothing is converted when nothing is selected.",
  "\n",
  Cell[BoxData[
   RowBox[{

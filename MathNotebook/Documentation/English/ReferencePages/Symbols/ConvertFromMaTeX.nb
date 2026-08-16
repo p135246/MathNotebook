@@ -24,40 +24,39 @@ Cell["ConvertFromMaTeX", "ObjectName",
  CellID->879636223,ExpressionUUID->"0d6e2da0-5fe3-4ed9-953d-2b29be25e8da"],
 
 Cell[TextData[{
- Cell["   ", "ModInfo",ExpressionUUID->"24610ba3-fd8d-463f-b292-8c91d9476d85"],
+ Cell["   ", "ModInfo",ExpressionUUID->"af08418b-45f2-36f6-bf57-c77dddbcdf46"],
  Cell[BoxData[
   RowBox[{
    ButtonBox["ConvertFromMaTeX",
     BaseStyle->"Link",
     ButtonData->"paclet:WolframInstitute/MathNotebook/ref/ConvertFromMaTeX"], 
-   
    RowBox[{"[", "]"}]}]], "InlineFormula",ExpressionUUID->
-  "cd495899-64b0-4b3b-b91a-08037799caf7"],
+  "4210126b-6590-1837-0194-3193ae34ce94"],
  " \[LineSeparator]",
- "converts the selected MaTeX-rendered cells back to native typeset math, or \
-all of them if nothing is selected.",
+ "converts the selected MaTeX-rendered math back to native typeset math, display cells and inline islands alike, or all of it if nothing is selected.",
  "\n",
  Cell[BoxData[
   RowBox[{
    ButtonBox["ConvertFromMaTeX",
     BaseStyle->"Link",
     ButtonData->"paclet:WolframInstitute/MathNotebook/ref/ConvertFromMaTeX"], 
-   
    RowBox[{"[", "notebook", "]"}]}]], "InlineFormula",ExpressionUUID->
-  "d40c59c9-4373-4be7-bb73-c3f76679670c"],
+  "923f6677-9bb5-5593-a620-b7f58a2a9b18"],
  " \[LineSeparator]",
- "converts the given notebook.",
- Cell["   ", "ModInfo",ExpressionUUID->"23433357-751d-440c-995d-a82ebdc516f3"],
+ "converts the given ",
+ Cell[BoxData[
+  StyleBox["notebook", "TI"]], "InlineFormula",ExpressionUUID->
+  "30c5dd48-6e7d-0c9e-6702-93c970c43ed4"],
+ ".",
+ "\n",
  Cell[BoxData[
   RowBox[{
    ButtonBox["ConvertFromMaTeX",
     BaseStyle->"Link",
     ButtonData->"paclet:WolframInstitute/MathNotebook/ref/ConvertFromMaTeX"], 
-   
-   RowBox[{"[", 
-    RowBox[{"{", 
-     RowBox[{"cell", ",", " ", "..."}], "}"}], "]"}]}]], "InlineFormula",
-  ExpressionUUID->"ec4eafa2-a314-4db4-83ba-5d4310e18127"],
+   RowBox[{"[", RowBox[{"{", 
+     RowBox[{"cell", ", ", " ", "..."}], "}"}], "]"}]}]], "InlineFormula",ExpressionUUID->
+  "9d1f432c-badc-440a-5954-def8213056fa"],
  " \[LineSeparator]",
  "converts the given cells."
 }], "Usage",

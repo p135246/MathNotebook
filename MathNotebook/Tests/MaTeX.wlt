@@ -99,3 +99,57 @@ VerificationTest[
   StringContainsQ[ $maTeXPreferences, "$MaTeXPreamble" ] && StringContainsQ[ $maTeXPreferences, "$useMaTeXQ = False" ],
   True
 ]
+
+(* Every display environment normalizes to its math-mode inner form, argument passed through where
+   the environment carries one, and the star only decides the number. *)
+VerificationTest[
+  Map[ displaySource,
+    { "\\begin{gather}a\\\\b\\end{gather}", "\\begin{multline*}a\\\\b\\end{multline*}",
+      "\\begin{alignat}{2}a&=b\\end{alignat}", "\\begin{flalign*}a&=b\\end{flalign*}" } ],
+  { { "\\begin{gathered}\na\\\\b\n\\end{gathered}", True },
+    { "\\begin{multlined}\na\\\\b\n\\end{multlined}", False },
+    { "\\begin{alignedat}\n{2}a&=b\n\\end{alignedat}", True },
+    { "\\begin{aligned}\na&=b\n\\end{aligned}", False } }
+]
+
+VerificationTest[
+  mathTeX[ Cell[ "", "DisplayFormulaNumbered",
+    TaggingRules -> <| "MathNotebook" -> <| "SourceTeX" -> "\\begin{gather}a\\\\b\\end{gather}" |> |> ] ],
+  "\\begin{gathered}\na\\\\b\n\\end{gathered}"
+]
+
+(* The native boxes of a stored inner environment are a grid, the alignedat argument stripped. *)
+VerificationTest[
+  MatchQ[ displayBodyBoxes[ "\\begin{gathered}\na\\\\b\n\\end{gathered}" ], _GridBox ] &&
+    MatchQ[ displayBodyBoxes[ "\\begin{alignedat}\n{2}a&=b\n\\end{alignedat}" ], _GridBox ],
+  True
+]
+
+(* A prose cell whose islands were rendered through MaTeX comes back as the typed text, islands
+   re-wearing their dollars and adjacent strings merged; the prose keeps its style and options. *)
+VerificationTest[
+  maTeXToLaTeXCell[ Cell[ TextData[ { "Let ", Cell[ "img", "InlineFormula",
+      TaggingRules -> <| "MathNotebook" -> <| "SourceTeX" -> "x^2", "MaTeX" -> True |> |> ],
+      " be a square." } ], "Text", CellID -> 3 ] ],
+  Cell[ "Let $x^2$ be a square.", "Text", CellID -> 3 ]
+]
+
+(* Prose with only native islands is not this conversion's business. *)
+VerificationTest[
+  maTeXToLaTeXCell[ Cell[ TextData[ { "Let ",
+      Cell[ BoxData[ FormBox[ "x", TraditionalForm ] ], "InlineFormula" ], " be." } ], "Text" ] ],
+  Cell[ TextData[ { "Let ",
+    Cell[ BoxData[ FormBox[ "x", TraditionalForm ] ], "InlineFormula" ], " be." } ], "Text" ]
+]
+
+(* An inline MaTeX island returns to a native typeset island with its source preserved. *)
+VerificationTest[
+  MatchQ[
+    fromMaTeXNotebook[ Notebook[ { Cell[ TextData[ { "Let ", Cell[ "img", "InlineFormula",
+        TaggingRules -> <| "MathNotebook" -> <| "SourceTeX" -> "x^2", "MaTeX" -> True |> |> ],
+        " be." } ], "Text" ] } ] ],
+    Notebook[ { Cell[ TextData[ { "Let ",
+      Cell[ BoxData[ FormBox[ SuperscriptBox[ "x", "2" ], TraditionalForm ] ], "InlineFormula", ___ ],
+      " be." } ], "Text" ] } ] ],
+  True
+]

@@ -149,7 +149,7 @@ VerificationTest[
 
 VerificationTest[
   displayParse[ "\\begin{align}a&=b\\\\c&=d\\end{align}" ],
-  { "a&=b\\\\c&=d", True, "Align" }
+  { "a&=b\\\\c&=d", True, "aligned" }
 ]
 
 VerificationTest[

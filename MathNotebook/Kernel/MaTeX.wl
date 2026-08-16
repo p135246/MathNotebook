@@ -12,6 +12,9 @@ PackageScope["executableDirectories"]
 PackageScope["mathTeX"]
 PackageScope["maTeXCellQ"]
 PackageScope["maTeXCell"]
+PackageScope["inlineMaTeXCell"]
+PackageScope["splitInlineMaTeX"]
+PackageScope["laTeXMixedMaTeXCells"]
 PackageScope["toMaTeXNotebook"]
 PackageScope["fromMaTeXNotebook"]
 PackageScope["laTeXToMaTeXCell"]
@@ -21,8 +24,18 @@ PackageScope["laTeXSourceText"]
 PackageScope["userInitFile"]
 PackageScope["$maTeXPreferences"]
 PackageScope["$maTeXBaseFontSize"]
+PackageScope["ensureMaTeX"]
 
 $maTeXBaseFontSize = 14
+
+(* Loading MaTeX is not enough for every environment the delimiter table admits: multlined lives in
+   mathtools, which MaTeX's BasePreamble does not carry. Added to the user Preamble once, and only
+   when absent, so an author's own preamble survives. *)
+ensureMaTeX[] :=
+  ( Needs[ "MaTeX`" ];
+    With[ { preamble = Lookup[ Options[ MaTeX`MaTeX ], "Preamble", { } ] },
+      If[ FreeQ[ preamble, line_String /; StringContainsQ[ line, "mathtools" ] ],
+        SetOptions[ MaTeX`MaTeX, "Preamble" -> Append[ preamble, "\\usepackage{mathtools}" ] ] ] ] )
 
 (* A MaTeX cell is an image, so it cannot inherit a style change and has to be rendered at the size
    the document is showing mathematics at right now. That size is maTeXFontSize, the same function
@@ -30,14 +43,14 @@ $maTeXBaseFontSize = 14
    converting at the fixed $maTeXBaseFontSize left every new cell at 14 until the slider was moved. *)
 ConvertToMaTeX[] :=
   withInputNotebook[ { notebook } |->
-    ( Needs[ "MaTeX`" ]; convertCells[ toMaTeXCell @ maTeXFontSize[ notebook ], notebook ] ) ]
+    ( ensureMaTeX[]; convertCells[ toMaTeXCell @ maTeXFontSize[ notebook ], notebook ] ) ]
 
 ConvertToMaTeX[ notebook_NotebookObject ] :=
-  ( Needs[ "MaTeX`" ];
+  ( ensureMaTeX[];
     NotebookPut[ toMaTeXNotebook[ NotebookGet[ notebook ], maTeXFontSize[ notebook ] ], notebook ] )
 
 ConvertToMaTeX[ cells : { __CellObject } ] :=
-  ( Needs[ "MaTeX`" ];
+  ( ensureMaTeX[];
     writeCells[ toMaTeXCell @ maTeXFontSize @ ParentNotebook @ First[ cells ], cells ] )
 
 ConvertFromMaTeX[] :=
@@ -59,10 +72,10 @@ ConvertFromMaTeX[ cells : { __CellObject } ] :=
    one touches only cells of a math style, where this one would render every prose cell in the paper. *)
 ConvertLaTeXToMaTeX[] :=
   withInputNotebook[ { notebook } |->
-    ( Needs[ "MaTeX`" ]; convertSelectedCells[ laTeXToMaTeXCell @ maTeXFontSize[ notebook ], notebook ] ) ]
+    ( ensureMaTeX[]; convertSelectedCells[ laTeXToMaTeXCell @ maTeXFontSize[ notebook ], notebook ] ) ]
 
 ConvertLaTeXToMaTeX[ cells : { __CellObject } ] :=
-  ( Needs[ "MaTeX`" ];
+  ( ensureMaTeX[];
     writeCells[ laTeXToMaTeXCell @ maTeXFontSize @ ParentNotebook @ First[ cells ], cells ] )
 
 ConvertMaTeXToLaTeX[] :=
@@ -89,7 +102,7 @@ InstallMaTeX[] :=
   (
     If[ ! PacletObjectQ @ Quiet @ PacletObject[ "MaTeX" ],
       Replace[ Quiet @ PacletInstall[ "MaTeX" ], _?FailureQ :> PacletInstall[ latestMaTeXReleaseURL[] ] ] ];
-    Needs[ "MaTeX`" ];
+    ensureMaTeX[];
     MaTeX`ConfigureMaTeX[
       "pdfLaTeX" -> findExecutable[ "pdflatex" ],
       "Ghostscript" -> findExecutable[ "gs" ] ]
@@ -109,8 +122,21 @@ toMaTeXCell[ size_ ][ cell : Cell[ _, style : "DisplayFormula" | "DisplayFormula
     If[ tex === $Failed, cell, maTeXCell[ tex, style, { options }, size ] ]
   ]
 
+(* Inline mathematics converts island by island: any box island in a prose cell whose TeX can be
+   read — its stored source, else its boxes — is re-rendered through MaTeX in text style. Buttons
+   and other unreadable islands pass through unchanged, so a citation survives the conversion. *)
+toMaTeXCell[ size_ ][ Cell[ TextData[ parts_ ], style_String, options___ ] ] :=
+  Cell[ TextData[ Flatten @ Map[ toInlineMaTeXPart[ size ], Flatten @ { parts } ] ], style, options ]
+
 toMaTeXCell[ size_ ][ cell_ ] :=
   cell
+
+toInlineMaTeXPart[ size_ ][ part : Cell[ BoxData[ _ ], ___ ] ] /; FreeQ[ part, _ButtonBox ] :=
+  With[ { tex = Replace[ storedSourceTeX[ part ], Except[ _String ] :> boxesToTeX @ cellBoxes[ part ] ] },
+    If[ StringQ[ tex ], inlineMaTeXCell[ tex, size ], part ] ]
+
+toInlineMaTeXPart[ _ ][ part_ ] :=
+  part
 
 (* The one place a MaTeX cell is built. Converting and re-rendering at a new size differ only in
    where the TeX comes from, and building both here is what keeps them from drifting apart on the
@@ -126,24 +152,94 @@ maTeXCell[ tex_String, style_String, options_List, size_, source_ ] :=
     TaggingRules -> <| "MathNotebook" -> <| "SourceTeX" -> tex, "MaTeX" -> True,
       If[ StringQ[ source ], "LaTeXSource" -> source, Nothing ] |> |> ]
 
+(* The one place an inline MaTeX island is built. "DisplayStyle" -> False is what \( ... \) means:
+   textstyle operators and fractions, sized to sit inside a prose line, where the display builder
+   above sets a displayed equation. The island carries the same tagging as a display cell, so
+   maTeXCellQ, the re-render and the trip back to LaTeX treat both forms through one predicate. *)
+inlineMaTeXCell[ tex_String, size_ ] :=
+  Cell[ BoxData[ ToBoxes @ MaTeX`MaTeX[ tex, "DisplayStyle" -> False, FontSize -> size ] ],
+    "InlineFormula",
+    TaggingRules -> <| "MathNotebook" -> <| "SourceTeX" -> tex, "MaTeX" -> True |> |> ]
+
+splitInlineMaTeX[ size_ ][ text_String ] :=
+  StringSplit[ text,
+    { Shortest[ "$" ~~ tex__ ~~ "$" ] /; StringFreeQ[ tex, "$" ] :> inlineMaTeXCell[ tex, size ],
+      Shortest[ "\\(" ~~ tex__ ~~ "\\)" ] :> inlineMaTeXCell[ tex, size ] } ]
+
 laTeXToMaTeXCell[ size_ ][ Cell[ TextData[ parts : _String | { __String } ], style_String, options___ ] ] :=
   laTeXToMaTeXCell[ size ][ Cell[ StringJoin @ Flatten @ { parts }, style, options ] ]
 
 laTeXToMaTeXCell[ size_ ][ Cell[ text_String, style_String /; StringFreeQ[ style, "Input" | "Code" | "Output" | "Program" | "Message" | "Print" ], options___ ] ] /; StringTrim[ text ] =!= "" :=
-  Apply[
-    { tex, numbered } |-> maTeXCell[ tex, If[ TrueQ[ numbered ], "DisplayFormulaNumbered", "DisplayFormula" ],
-      { options }, size, text ],
-    displaySource[ text ] ]
+  If[ mixedLaTeXQ[ text ],
+    laTeXMixedMaTeXCells[ text, style, { options }, size ],
+    Apply[
+      { tex, numbered } |-> maTeXCell[ tex, If[ TrueQ[ numbered ], "DisplayFormulaNumbered", "DisplayFormula" ],
+        { options }, size, text ],
+      displaySource[ text ] ] ]
 
 laTeXToMaTeXCell[ _ ][ cell_ ] :=
   cell
+
+(* A cell that is one display formula — or carries no delimiter at all, a bare \frac{a}{b} — renders
+   whole through the branch above. A cell of prose with mathematics inside it renders piecewise. *)
+mixedLaTeXQ[ text_String ] :=
+  displayParse[ StringTrim[ text ] ] === $Failed &&
+    ( StringContainsQ[ text, "$" | "\\(" ] ||
+      ! StringFreeQ[ text, Alternatives @@ Cases[ $displayDelimiters[[ All, 1 ]], Except[ "$$" ] ] ] )
+
+(* The MaTeX twin of convertLaTeXCell: display spans become MaTeX display cells of their own, each
+   remembering the span as typed, and the chunks between them become prose cells whose $ ... $ and
+   \( ... \) runs are inline MaTeX islands. *)
+laTeXMixedMaTeXCells[ text_String, style_String, options_List, size_ ] :=
+  Replace[
+    Replace[ mergeStrings @ splitDisplayMaTeX[ size ][ text ],
+      parts_List :> MapIndexed[
+        { part, position } |-> maTeXPartCell[ part, style, If[ position === { 1 }, options, { } ], size ],
+        DeleteCases[ Replace[ parts, chunk_String :> StringTrim[ chunk ], { 1 } ], "" ] ] ],
+    { single_Cell } :> single ]
+
+splitDisplayMaTeX[ size_ ][ text_String ] :=
+  StringSplit[ text,
+    Map[ Apply[ { open, close, numbered, environment } |->
+        ( span : ( open ~~ Shortest[ body__ ] ~~ close ) :> maTeXDisplaySpan[ span, size ] ) ],
+      $displayDelimiters ] ]
+
+maTeXDisplaySpan[ span_String, size_ ] :=
+  Apply[
+    { tex, numbered } |-> maTeXCell[ tex,
+      If[ TrueQ[ numbered ], "DisplayFormulaNumbered", "DisplayFormula" ], { }, size, span ],
+    displaySource @ StringTrim[ span ] ]
+
+maTeXPartCell[ part_Cell, _, options_List, _ ] :=
+  Replace[ part, Cell[ content_, partStyle_String, tagging___ ] :> Cell[ content, partStyle, tagging, Sequence @@ options ] ]
+
+maTeXPartCell[ chunk_String, style_String, options_List, size_ ] :=
+  Replace[ splitInlineMaTeX[ size ][ chunk ],
+    { { unchanged_String } :> Cell[ unchanged, style, Sequence @@ options ],
+      parts_List :> Cell[ TextData[ parts ], style, Sequence @@ options ] } ]
 
 maTeXToLaTeXCell[ cell : Cell[ _, style_String, options___ ] ] /; maTeXCellQ[ cell ] :=
   With[ { text = laTeXSourceText[ cell, style ] },
     If[ StringQ[ text ], Cell[ text, "Text", Sequence @@ retainedCellOptions[ { options } ] ], cell ] ]
 
+(* A prose cell whose islands were rendered through MaTeX comes back as typed text: each island's
+   stored source re-wears its dollars, native islands and font runs serialize as in ConvertMath, and
+   adjacent strings merge — so a ConvertLaTeXToMaTeX followed by this returns the text as typed, up
+   to \( ... \) coming back as $ ... $. Prose with only native islands is left to ConvertMath. *)
+maTeXToLaTeXCell[ Cell[ TextData[ parts_ ], style_String, options___ ] ] /;
+    ! FreeQ[ { parts }, part_Cell /; maTeXCellQ[ part ] ] :=
+  Replace[ mergeStrings @ Map[ maTeXInlinePartToTeX, Flatten @ { parts } ],
+    { { text_String } :> Cell[ text, style, options ],
+      merged_List :> Cell[ TextData[ merged ], style, options ] } ]
+
 maTeXToLaTeXCell[ cell_ ] :=
   cell
+
+maTeXInlinePartToTeX[ part_Cell /; maTeXCellQ[ part ] ] :=
+  Replace[ storedSourceTeX[ part ], { tex_String :> "$" <> tex <> "$", _ :> part } ]
+
+maTeXInlinePartToTeX[ part_ ] :=
+  inlinePartToTeX[ part ]
 
 (* What was typed, where the cell was made from typed LaTeX; the stored body wearing the delimiters
    its style implies, where it was made from typeset mathematics instead and has no source of its own. *)
@@ -164,8 +260,20 @@ fromMaTeXCell[ cell : Cell[ _, style_String, options___ ] ] /; maTeXCellQ[ cell 
       TaggingRules -> <| "MathNotebook" -> <| "SourceTeX" -> tex |> |> ]
   ]
 
+(* MaTeX islands in prose return to native typeset islands, source preserved, so the built-in math
+   size control reaches them again. *)
+fromMaTeXCell[ Cell[ TextData[ parts_ ], style_String, options___ ] ] /;
+    ! FreeQ[ { parts }, part_Cell /; maTeXCellQ[ part ] ] :=
+  Cell[ TextData[ Flatten @ Map[ fromInlineMaTeXPart, Flatten @ { parts } ] ], style, options ]
+
 fromMaTeXCell[ cell_ ] :=
   cell
+
+fromInlineMaTeXPart[ part_Cell /; maTeXCellQ[ part ] ] :=
+  Replace[ storedSourceTeX[ part ], { tex_String :> inlineMathCell[ tex ], _ :> part } ]
+
+fromInlineMaTeXPart[ part_ ] :=
+  part
 
 maTeXCellQ[ Cell[ ___, TaggingRules -> tagging_, ___ ] ] :=
   TrueQ @ Lookup[ Association @ Lookup[ Association @ tagging, "MathNotebook", <||> ], "MaTeX", False ]

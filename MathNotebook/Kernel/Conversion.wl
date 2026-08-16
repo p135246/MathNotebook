@@ -8,6 +8,9 @@ PackageScope["$glyphlessMacros"]
 PackageScope["boxesToTeX"]
 PackageScope["splitInlineMath"]
 PackageScope["splitDisplayMath"]
+PackageScope["inlineMathCell"]
+PackageScope["inlinePartToTeX"]
+PackageScope["$displayDelimiters"]
 PackageScope["mergeStrings"]
 PackageScope["alignBoxes"]
 PackageScope["displayParse"]
@@ -324,13 +327,27 @@ alignBoxes[ body_String ] :=
       StringSplit[ body, "\\\\" ] ],
     GridBoxAlignment -> { "Columns" -> { { Right, Left } } } ]
 
+(* The fourth field is the math-mode inner environment the display environment wraps — what MaTeX
+   and the front end are given, since the outer environment is the page's business — or None where
+   the body is bare mathematics already. The closing brace of each opener keeps the prefixes apart:
+   \begin{align} cannot take the first thirteen characters of \begin{alignat}, because the "}" the
+   opener demands is an "a" there. alignat and alignedat both carry the column-count argument, so
+   the body passes it through unchanged; the native grid strips it (stripGridArgument). *)
 $displayDelimiters = {
-  { "$$", "$$", False, "Single" },
-  { "\\[", "\\]", False, "Single" },
-  { "\\begin{equation*}", "\\end{equation*}", False, "Single" },
-  { "\\begin{equation}", "\\end{equation}", True, "Single" },
-  { "\\begin{align*}", "\\end{align*}", False, "Align" },
-  { "\\begin{align}", "\\end{align}", True, "Align" } }
+  { "$$", "$$", False, None },
+  { "\\[", "\\]", False, None },
+  { "\\begin{equation*}", "\\end{equation*}", False, None },
+  { "\\begin{equation}", "\\end{equation}", True, None },
+  { "\\begin{align*}", "\\end{align*}", False, "aligned" },
+  { "\\begin{align}", "\\end{align}", True, "aligned" },
+  { "\\begin{gather*}", "\\end{gather*}", False, "gathered" },
+  { "\\begin{gather}", "\\end{gather}", True, "gathered" },
+  { "\\begin{multline*}", "\\end{multline*}", False, "multlined" },
+  { "\\begin{multline}", "\\end{multline}", True, "multlined" },
+  { "\\begin{alignat*}", "\\end{alignat*}", False, "alignedat" },
+  { "\\begin{alignat}", "\\end{alignat}", True, "alignedat" },
+  { "\\begin{flalign*}", "\\end{flalign*}", False, "aligned" },
+  { "\\begin{flalign}", "\\end{flalign}", True, "aligned" } }
 
 displayParse[ trimmed_String ] :=
   First[ StringCases[ trimmed,
@@ -345,29 +362,39 @@ splitDisplayMath[ text_String ] :=
         ( span : ( open ~~ Shortest[ body__ ] ~~ close ) :> displaySpanCell[ span, body, numbered, kind ] ) ],
       $displayDelimiters ] ]
 
-displaySpanCell[ span_String, body_String, numbered_, "Single" ] :=
+displaySpanCell[ span_String, body_String, numbered_, None ] :=
   Replace[ texToBoxes[ StringTrim[ body ] ],
     { $Failed -> span,
       boxes_ :> displayFormulaCell[ boxes, numbered, span ] } ]
 
-displaySpanCell[ span_String, body_String, numbered_, "Align" ] :=
-  displayFormulaCell[ alignBoxes[ StringTrim[ body ] ], numbered, span ]
+displaySpanCell[ span_String, body_String, numbered_, environment_String ] :=
+  displayFormulaCell[ alignBoxes @ stripGridArgument @ StringTrim[ body ], numbered, span ]
 
 (* The LaTeX a display cell is rendered from and whether its source asked for a number: the body
    inside the delimiters where the text carries any, the whole of it where it carries none, so a
-   bare fragment is as renderable as a full environment. An align becomes an aligned, which is what
+   bare fragment is as renderable as a full environment. A multiline environment becomes its
+   math-mode inner form — align an aligned, gather a gathered, multline a multlined — which is what
    MaTeX and the front end both draw where the outer environment is the page's business. *)
 displaySource[ text_String ] :=
   Replace[ displayParse @ StringTrim[ text ],
-    { { body_, numbered_, "Align" } :>
-        { "\\begin{aligned}\n" <> StringTrim[ body ] <> "\n\\end{aligned}", numbered },
-      { body_, numbered_, _ } :> { StringTrim[ body ], numbered },
+    { { body_, numbered_, environment_String } :>
+        { "\\begin{" <> environment <> "}\n" <> StringTrim[ body ] <> "\n\\end{" <> environment <> "}", numbered },
+      { body_, numbered_, None } :> { StringTrim[ body ], numbered },
       $Failed :> { StringTrim[ text ], False } } ]
+
+$innerEnvironments = { "aligned", "gathered", "multlined", "alignedat" }
+
+(* alignat and alignedat open with the column count; the grid reads rows and columns from the body
+   alone, so the argument comes off first. *)
+stripGridArgument[ body_String ] :=
+  StringReplace[ body, StartOfString ~~ "{" ~~ DigitCharacter .. ~~ "}" -> "", 1 ]
 
 displayBodyBoxes[ tex_String ] :=
   First[ StringCases[ StringTrim[ tex ],
-    StartOfString ~~ "\\begin{aligned}" ~~ body__ ~~ "\\end{aligned}" ~~ EndOfString :>
-      alignBoxes[ StringTrim[ body ] ] ],
+    StartOfString ~~ "\\begin{" ~~ environment : WordCharacter .. ~~ "}" ~~ body__ ~~
+        "\\end{" ~~ closing : WordCharacter .. ~~ "}" ~~ EndOfString /;
+          environment === closing && MemberQ[ $innerEnvironments, environment ] :>
+      alignBoxes @ stripGridArgument @ StringTrim[ body ] ],
     Replace[ texToBoxes[ tex ], $Failed -> tex ] ]
 
 displayFormulaCell[ boxes_, numbered_, sourceTeX_String ] :=

@@ -22,6 +22,7 @@ PackageScope["relativeMathScale"]
 PackageScope["maTeXFontSize"]
 PackageScope["rescaleMaTeXCells"]
 PackageScope["resizedMaTeXCell"]
+PackageScope["maTeXContentQ"]
 
 (* BasicFunctionality T5: the same $Failed hole the five referencing entry points had — with no
    document open this handed $Failed to the notebook_NotebookObject overload, which matches nothing,
@@ -286,12 +287,28 @@ maTeXFontSize[ parent_, settings_Association ] :=
   Round[ $maTeXBaseFontSize Replace[ mathViewScale[ parent, settings ], Automatic -> 1 ] ]
 
 rescaleMaTeXCells[ notebook_NotebookObject ] :=
-  With[ { cells = Select[ Cells[ notebook ], maTeXCellQ @ NotebookRead[ # ] & ] },
+  With[ { cells = Select[ Cells[ notebook ], maTeXContentQ @ NotebookRead[ # ] & ] },
     If[ cells =!= { },
-      Needs[ "MaTeX`" ];
+      ensureMaTeX[];
       writeCells[ resizedMaTeXCell[ maTeXFontSize[ notebook ] ], cells ] ] ]
+
+(* The slider must reach inline MaTeX islands as well as display cells, and an island lives inside
+   a prose cell the display predicate says nothing about. *)
+maTeXContentQ[ cell : Cell[ content_, ___ ] ] :=
+  maTeXCellQ[ cell ] || ! FreeQ[ content, part_Cell /; maTeXCellQ[ part ] ]
+
+maTeXContentQ[ _ ] :=
+  False
 
 (* The author's own source is carried across the re-render, or dragging either slider would silently
    cost a converted cell the text ConvertMaTeXToLaTeX gives back. *)
-resizedMaTeXCell[ size_ ][ cell : Cell[ _, style_String, options___ ] ] :=
+resizedMaTeXCell[ size_ ][ cell : Cell[ _, style_String, options___ ] ] /; maTeXCellQ[ cell ] :=
   maTeXCell[ storedSourceTeX[ cell ], style, { options }, size, storedLaTeXSource[ cell ] ]
+
+resizedMaTeXCell[ size_ ][ Cell[ TextData[ parts_ ], style_String, options___ ] ] :=
+  Cell[ TextData[ Map[
+      Replace[ part_Cell /; maTeXCellQ[ part ] :> inlineMaTeXCell[ storedSourceTeX[ part ], size ] ],
+      Flatten @ { parts } ] ], style, options ]
+
+resizedMaTeXCell[ _ ][ cell_ ] :=
+  cell

@@ -33,7 +33,7 @@ Cell[TextData[{
    RowBox[{"[", "]"}]}]], "InlineFormula",ExpressionUUID->
   "0372cca1-e2d1-c65a-ad30-e282fe332779"],
  " \[LineSeparator]",
- "turns the selected MaTeX-rendered cells back into text cells of LaTeX source, or all of them if nothing is selected. A cell rendered from typed source gives that source back verbatim; one rendered from typeset math gives the stored TeX wearing the delimiters its style implies.",
+ "turns the selected MaTeX-rendered math back into typed LaTeX, or all of it if nothing is selected. A cell rendered from typed source gives that source back verbatim; one rendered from typeset math gives the stored TeX wearing the delimiters its style implies; inline islands in prose re-wear their dollars in place.",
  "\n",
  Cell[BoxData[
   RowBox[{
