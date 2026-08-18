@@ -18,6 +18,7 @@ PackageScope["displaySource"]
 PackageScope["displayBodyBoxes"]
 PackageScope["storedSourceTeX"]
 PackageScope["storedLaTeXSource"]
+PackageScope["maTeXEditedQ"]
 PackageScope["cellBoxes"]
 PackageScope["retainedCellOptions"]
 PackageScope["convertLaTeXNotebook"]
@@ -492,13 +493,25 @@ fontTeX[ command_String, content_ ] :=
 mergeStrings[ parts_List ] :=
   FixedPoint[ Replace[ { before___, first_String, second_String, after___ } :> { before, first <> second, after } ], parts ]
 
+(* EditableMaTeX T1, Pavel's call: where a cell carries the front end's TeX assistant box, the box's own
+   "input" slot is the source of truth and the tagging rule is its mirror — so TeX the author edited in
+   the notebook reaches the .tex, the thebibliography side of this repo's who-owns-the-entries split
+   rather than the .bib side. Every path that reads a MaTeX cell's TeX goes through here (displayTeXString,
+   inlinePartToTeX, mathTeX, laTeXSourceText, resizedMaTeXCell), so the precedence is stated once.
+   A cell the author made with Ctrl+4 alone carries the box and no rule, and now exports its TeX too. *)
 storedSourceTeX[ cell_ ] :=
-  storedTagging[ cell, "SourceTeX" ]
+  Replace[ maTeXBoxTeX[ cell ], $Failed :> storedTagging[ cell, "SourceTeX" ] ]
 
 (* Kept apart from the TeX a cell is rendered from: a re-render is given the body, and the author's
-   own text — delimiters, line breaks and all — is what the trip back to LaTeX gives him. *)
+   own text — delimiters, line breaks and all — is what the trip back to LaTeX gives him. An edit to
+   the box invalidates it: the two describe the same mathematics and only one of them was changed, so
+   giving back the recorded text would silently discard the edit and re-export the old formula. *)
 storedLaTeXSource[ cell_ ] :=
-  storedTagging[ cell, "LaTeXSource" ]
+  If[ maTeXEditedQ[ cell ], $Failed, storedTagging[ cell, "LaTeXSource" ] ]
+
+maTeXEditedQ[ cell_ ] :=
+  With[ { edited = maTeXBoxTeX[ cell ] },
+    StringQ[ edited ] && edited =!= storedTagging[ cell, "SourceTeX" ] ]
 
 storedTagging[ Cell[ ___, TaggingRules -> tagging_, ___ ], key_String ] :=
   Lookup[ Association @ Lookup[ Association @ tagging, "MathNotebook", <||> ], key, $Failed ]
