@@ -105,9 +105,29 @@ render showed the `=` was there all along.
       plugin's `research-notebook` skill) then needs no change, and a notebook opened on a machine with
       no LaTeX still shows the mathematics it was written with.
 
+      **Corrected 2026-08-18 (S2): the inline converter now exists** — it arrived on `main` in 0.1.24
+      while this item sat on a diverged clone. `laTeXToMaTeXCell` branches on `mixedLaTeXQ` into
+      `laTeXMixedMaTeXCells`, whose `maTeXPartCell` sends each prose chunk through `splitInlineMaTeX`,
+      so a `$…$` or `\( … \)` island becomes an `inlineMaTeXCell`. The four palette buttons already
+      route through those entry points, so what is actually left of T3 is narrower than written: decide
+      whether the inline grain wants **its own** two buttons, and fix the button descriptions (T5).
+
 - [ ] T4 — the two findings above: a `Tests/Conversion.wlt` assertion that a subscripted
       special-function name is routed to `presentationBoxes` rather than parsed, and the CLAUDE.md
       lines for both.
+
+- [ ] T5 — **two palette descriptions are now false**, and one contradicts this item's own T1.
+      `math → MaTeX` still says *"The result is an image rather than editable math, so render last"* —
+      T1 made it editable, which was the point. `LaTeX → MaTeX` still says it takes *"each cell whole"*
+      — 0.1.24 stopped doing that for prose cells. Both live in `Scripts/BuildPalette.wls`; regenerate
+      the palette after, and note that `Tests/Palette.wlt` reads labels and structure, not prose, so
+      neither string is asserted. This is the staleness `CLAUDE.md` warns about under the tutorial
+      bullet, one directory over.
+
+- [ ] T6 — the release call: `PacletInfo.wl` still reads **0.1.24**, which is the published version,
+      while `main` now also carries T1. Either bump and publish, or leave it and accept that installed
+      0.1.24 and the repo differ by T1 — the clone/install disagreement the wiki article flags. Not the
+      merge's decision to make.
 
 ### Done
 
@@ -149,3 +169,32 @@ makes it survive the unwrapping bite.
 **Still open and not this task's:** T2 is what decides whether an *edit* comes back as MaTeX or as
 native boxes, so until it lands the box is editable and the re-render is the built-in parser's unless
 the author has turned `$useMaTeXQ` on himself.
+
+### S2 — 2026-08-18 — the merge
+
+**No task closed; this was integration.** The two clones had diverged with neither holding the other's
+HEAD: this item's T1 (`63d6c28`) lived only in the author's Dropbox working copy, while `origin/main`
+carried 0.1.24's inline islands and multiline display environments (`b99cde6`). Both were MaTeX work on
+the same four files. Merged as `4f2495d`, and all three copies plus `origin/main` now sit on it.
+
+The sides were **complementary rather than competing** — 0.1.24 added coverage (inline islands, the
+`$displayDelimiters` fourth field, `ensureMaTeX` pulling in mathtools for `multlined`), T1 changed
+representation (the assistant box, the `"input"` slot's precedence, the edit-invalidated
+`"LaTeXSource"`). Only `MaTeX.wl` conflicted and both hunks were pure add/add.
+
+**One integration no textual merge would have made:** `inlineMaTeXCell` now wraps its island in
+`maTeXBox` too. 0.1.24 wrote that builder before the box existed, so without it a display formula was
+editable and an inline island silently was not. It composes the other way as well — `maTeXBoxTeX` was
+kept narrow *because* "a `Text` cell may hold several inline assistant boxes", which was hypothetical
+when T1 was written and is the ordinary case now that islands are wrapped: each island is its own
+`Cell`, so `storedSourceTeX` reads it per island and an edited island exports its edit.
+
+**Suite 398 passed, 0 failed**, against a same-session baseline of **390** on `b99cde6` — the delta is
+exactly T1's eight assertions (`MaTeX.wlt` 21 → 28, `FrontEnd.wlt` 62 → 63) and no other file moved.
+The 416 recorded in S1 was a different environment and is not the comparison.
+
+**A hazard worth recording:** git surgery inside the Dropbox folder races the sync daemon — a rebase
+attempted there aborted mid-flight on `FrontEnd.wlt` and `MaTeX.wlt`, files the daemon had touched
+underneath it. The merge was therefore done in the plugin's reference clone and handed back by
+fast-forward. That clone is now formally read-only: the plugin's `CLAUDE.md` records this Dropbox copy
+as the source of truth, where edits are made and from which pushes go.
